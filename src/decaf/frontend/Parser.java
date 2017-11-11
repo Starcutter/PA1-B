@@ -79,24 +79,45 @@ public class Parser extends Table {
      * @return the parsed value of `symbol` if parsing succeeded, otherwise `null`.
      */
     private SemValue parse(int symbol, Set<Integer> follow) {
-        Pair<Integer, List<Integer>> result = query(symbol, lookahead); // get production by lookahead symbol
-        int actionId = result.getKey(); // get user-defined action
-
-        List<Integer> right = result.getValue(); // right-hand side of production
-        int length = right.size();
-        SemValue[] params = new SemValue[length + 1];
-
-        for (int i = 0; i < length; i++) { // parse right-hand side symbols one by one
-            int term = right.get(i);
-            params[i + 1] = isNonTerminal(term)
-                    ? parse(term, follow) // for non terminals: recursively parse it
-                    : matchToken(term) // for terminals: match token
-                    ;
-        }
-
-        params[0] = new SemValue(); // initialize return value
-        act(actionId, params); // do user-defined action
-        return params[0];
+    	if(beginSet(symbol).contains(lookahead)) {
+	    	Pair<Integer, List<Integer>> result = query(symbol, lookahead); // get production by lookahead symbol
+	        int actionId = result.getKey(); // get user-defined action
+	
+	        List<Integer> right = result.getValue(); // right-hand side of production
+	        int length = right.size();
+	        SemValue[] params = new SemValue[length + 1];
+	        
+	        Set<Integer> union = new HashSet<Integer>();
+	        union.addAll(follow);
+	        union.addAll(followSet(symbol));
+	
+	        for (int i = 0; i < length; i++) { // parse right-hand side symbols one by one
+	            int term = right.get(i);
+	            params[i + 1] = isNonTerminal(term)
+	                    ? parse(term, union) // for non terminals: recursively parse it
+	                    : matchToken(term) // for terminals: match token
+	                    ;
+	        }
+	        params[0] = new SemValue(); // initialize return value
+	        for (int i = 0; i < length + 1; i++)
+	        	if(params[i] == null) 
+	        		return null;
+	        act(actionId, params);
+	        return params[0];
+    	}
+    	else {
+    		error();
+    		while(!(beginSet(symbol).contains(lookahead) 
+                    || followSet(symbol).contains(lookahead)
+    				|| follow.contains(lookahead)))
+    			lookahead = lex();
+        	if(beginSet(symbol).contains(lookahead)) {
+        		return parse(symbol, follow);
+        	}
+        	else {
+        		return null;
+        	}
+    	}
     }
 
     /**
